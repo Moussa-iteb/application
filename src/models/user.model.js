@@ -48,6 +48,11 @@ const User = sequelize.define('User', {
     defaultValue: true,
     field: 'is_active'
   },
+  isBlocked: {
+  type: DataTypes.BOOLEAN,
+  defaultValue: false,
+  field: 'is_blocked'
+},
   lastLoginAt: {
     type: DataTypes.DATE,
     allowNull: true,
