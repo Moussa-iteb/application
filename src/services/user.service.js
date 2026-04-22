@@ -2,8 +2,8 @@ const User = require('../models/user.model');
 
 class UserService {
 
-  // جلب كل المستخدمين مع pagination
-  async getAllUsers({ page = 1, limit = 10, role, isActive, isBlocked }) {
+  // GET ALL USERS
+  async getAllUsers({ page = 1, limit = 100, role, isActive, isBlocked }) {
     const offset = (page - 1) * limit;
     const where = {};
 
@@ -29,12 +29,50 @@ class UserService {
     };
   }
 
-  // حذف مستخدم
+  // UPDATE USER
+  async updateUser(id, { username, email, firstName, lastName, role }) {
+    const user = await User.findByPk(id);
+    if (!user) {
+      throw { status: 404, message: 'User not found' };
+    }
+
+    // ✅ Construire uniquement les champs fournis
+    const updateData = {};
+    if (username  && username.trim().length >= 3) updateData.username  = username.trim();
+    if (email     && email.trim())                updateData.email     = email.trim();
+    if (firstName !== undefined && firstName !== null) updateData.firstName = firstName;
+    if (lastName  !== undefined && lastName  !== null) updateData.lastName  = lastName;
+    if (role && ['user', 'admin'].includes(role))      updateData.role      = role;
+
+    console.log('📝 Updating user ID:', id, 'with:', updateData);
+
+    await user.update(updateData);
+    await user.reload();
+    return user;
+  }
+
+  // BLOCK / UNBLOCK USER
+  async toggleBlockUser(id, blocked) {
+    const user = await User.findByPk(id);
+    if (!user) {
+      throw { status: 404, message: 'User not found' };
+    }
+
+    console.log(`🔒 ${blocked ? 'Blocking' : 'Unblocking'} user ID:`, id);
+
+    await user.update({ isBlocked: blocked });
+    await user.reload();
+    return user;
+  }
+
+  // DELETE USER
   async deleteUser(id) {
     const user = await User.findByPk(id);
     if (!user) {
       throw { status: 404, message: 'User not found' };
     }
+
+    console.log('🗑️ Deleting user ID:', id);
     await user.destroy();
     return { message: 'User deleted successfully' };
   }

@@ -62,9 +62,9 @@ const Bike = sequelize.define('Bike', {
     field: 'motor_status'
   },
   status: {
-    type: DataTypes.ENUM('Available', 'In Use', 'Maintenance', 'Offline'),
-    defaultValue: 'Available'
-  },
+  type: DataTypes.ENUM('Available', 'In Use', 'Maintenance', 'Offline'),
+  defaultValue: 'Available'
+},
   isLocked: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,

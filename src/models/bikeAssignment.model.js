@@ -1,5 +1,7 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('./index');
+const User = require('./user.model');
+const Bike = require('./bike.model');
 
 const BikeAssignment = sequelize.define('BikeAssignment', {
   id: {
@@ -41,5 +43,9 @@ const BikeAssignment = sequelize.define('BikeAssignment', {
   timestamps: true,
   underscored: true
 });
+
+// ✅ Associations
+BikeAssignment.belongsTo(User, { foreignKey: 'user_id' });
+BikeAssignment.belongsTo(Bike, { foreignKey: 'bike_id' });
 
 module.exports = BikeAssignment;

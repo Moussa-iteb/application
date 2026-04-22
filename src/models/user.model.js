@@ -10,20 +10,13 @@ const User = sequelize.define('User', {
   username: {
     type: DataTypes.STRING(50),
     allowNull: false,
-    unique: true,
-    validate: {
-      len: [3, 50],
-      notEmpty: true
-    }
+    unique: true
   },
   email: {
     type: DataTypes.STRING(100),
     allowNull: false,
     unique: true,
-    validate: {
-      isEmail: true,
-      notEmpty: true
-    }
+    validate: { isEmail: true }
   },
   password: {
     type: DataTypes.STRING(255),
@@ -49,14 +42,25 @@ const User = sequelize.define('User', {
     field: 'is_active'
   },
   isBlocked: {
-  type: DataTypes.BOOLEAN,
-  defaultValue: false,
-  field: 'is_blocked'
-},
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    field: 'is_blocked'
+  },
   lastLoginAt: {
     type: DataTypes.DATE,
     allowNull: true,
     field: 'last_login_at'
+  },
+  // ✅ ICI — dans le bon objet
+  resetCode: {
+    type: DataTypes.STRING(6),
+    allowNull: true,
+    field: 'reset_code'
+  },
+  resetCodeExpires: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'reset_code_expires'
   }
 }, {
   tableName: 'users',

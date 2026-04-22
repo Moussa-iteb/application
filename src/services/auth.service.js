@@ -47,20 +47,54 @@ class AuthService {
   async login({ email, password }) {
     const user = await User.scope('withPassword').findOne({ where: { email } });
 
-    if (!user) {
-      throw { status: 401, message: 'Invalid email or password' };
+    if (!user) throw { status: 401, message: 'Invalid credentials' };
+
+    // ✅ Utilise comparePassword au lieu de bcrypt.compare
+    const isValid = await comparePassword(password, user.password);
+    if (!isValid) throw { status: 401, message: 'Invalid credentials' };
+
+    // ✅ Vérifier que c'est un admin
+    if (user.role !== 'admin') {
+      throw { status: 403, message: 'Access denied. Admins only.' };
     }
 
-    if (!user.isActive) {
-      throw { status: 403, message: 'Account is deactivated' };
+    if (user.isBlocked) {
+      throw { status: 403, message: 'Your account has been blocked.' };
     }
 
-    const isPasswordValid = await comparePassword(password, user.password);
-    if (!isPasswordValid) {
-      throw { status: 401, message: 'Invalid email or password' };
+    // ✅ Utilise generateToken au lieu de jwt.sign
+    const token = generateToken({
+      id: user.id,
+      email: user.email,
+      role: user.role
+    });
+
+    return {
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role
+      }
+    };
+  }
+async loginUser({ email, password }) {
+    const user = await User.scope('withPassword').findOne({ where: { email } });
+
+    if (!user) throw { status: 401, message: 'Invalid credentials' };
+
+    const isValid = await comparePassword(password, user.password);
+    if (!isValid) throw { status: 401, message: 'Invalid credentials' };
+
+    // users seulement — admin ممنوع
+    if (user.role === 'admin') {
+      throw { status: 403, message: 'Access denied. Admins only on web.' };
     }
 
-    await user.update({ lastLoginAt: new Date() });
+    if (user.isBlocked) {
+      throw { status: 403, message: 'Your account has been blocked.' };
+    }
 
     const token = generateToken({
       id: user.id,
@@ -69,19 +103,15 @@ class AuthService {
     });
 
     return {
+      token,
       user: {
         id: user.id,
         username: user.username,
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        lastLoginAt: user.lastLoginAt
-      },
-      token
+        role: user.role
+      }
     };
   }
-
   async getProfile(userId) {
     const user = await User.findByPk(userId);
     if (!user) {

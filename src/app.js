@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const cors = require('cors');  // ← AJOUTÉ
 const sequelize = require('./models/index');
 const { port } = require('./config/config');
 const authRoutes = require('./routes/auth.routes');
@@ -10,6 +11,17 @@ const bikeAssignmentRoutes = require('./routes/bikeAssignment.routes');
 const { errorHandler, notFoundHandler } = require('./middleware/error.middleware');
 
 const app = express();
+
+// ===== CORS ===== (doit être AVANT tout le reste)
+app.use(cors({
+  origin: [
+    'http://localhost:4200',
+    'http://192.168.1.25:4200'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -31,7 +43,7 @@ const startServer = async () => {
     await sequelize.sync({ alter: true });
     console.log('✅ Database connected and synced');
 
-    app.listen(port, () => {
+    app.listen(port, '0.0.0.0', () => {
       console.log(`🚀 Server running on http://localhost:${port}`);
       console.log(`   POST   /api/auth/register`);
       console.log(`   POST   /api/auth/login`);
