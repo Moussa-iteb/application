@@ -1,5 +1,6 @@
 const bikeAssignmentService = require('../services/bikeAssignment.service');
-
+const Bike = require('../models/bike.model');
+const BikeAssignment = require('../models/bikeAssignment.model');
 class BikeAssignmentController {
 
   // POST /api/bike-assignments
@@ -89,6 +90,65 @@ class BikeAssignmentController {
       next(error);
     }
   }
+  async returnMyBike(req, res, next) {
+    try {
+        const userId = req.user.id;
+        const assignment = await BikeAssignment.findOne({
+            where: { userId, status: 'active' }
+        });
+
+        if (!assignment) {
+            return res.status(404).json({
+                success: false,
+                message: 'No active bike found'
+            });
+        }
+
+        await assignment.update({
+            status: 'returned',
+            returnedAt: new Date()
+        });
+
+        await Bike.update(
+            { status: 'Available' },
+            { where: { id: assignment.bikeId } }
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: 'Bike returned successfully'
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+async getMyActiveBike(req, res, next) {
+    try {
+        const userId = req.user.id;
+        const assignment = await BikeAssignment.findOne({
+            where: { userId, status: 'active' },
+            include: [{ model: Bike }]
+        });
+
+        if (!assignment) {
+            return res.status(200).json({
+                success: false,
+                message: 'No active bike'
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Active bike found',
+            data: {
+                bike: assignment.Bike,
+                assignment: assignment
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+}
 }
 
 module.exports = new BikeAssignmentController();

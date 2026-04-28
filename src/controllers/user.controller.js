@@ -58,7 +58,17 @@ class UserController {
       next(error);
     }
   }
-
+async changePassword(req, res) {
+  try {
+    const result = await userService.changePassword(
+      req.params.id,
+      req.body
+    );
+    res.json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+}
   // DELETE /api/users/:id
   async deleteUser(req, res, next) {
     try {

@@ -32,6 +32,19 @@ class BikeController {
     }
   }
 
+  // GET /api/bikes/available
+  async getAvailableBikes(req, res, next) {
+    try {
+      const bikes = await bikeService.getAvailableBikes();
+      return res.status(200).json({
+        success: true,
+        data: { bikes }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // GET /api/bikes/:id
   async getBikeById(req, res, next) {
     try {
@@ -71,6 +84,28 @@ class BikeController {
       next(error);
     }
   }
+
+  // POST /api/bikes/scan
+  async scanBike(req, res, next) {
+  try {
+    const { qrCode } = req.body;
+    const userId = req.user.id;
+
+    const result = await bikeService.scanBike(qrCode, userId);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Bike assigned successfully',
+      data: {
+        bike: result.bike,
+        assignment: result.assignment
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 }
 
 module.exports = new BikeController();

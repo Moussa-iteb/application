@@ -32,6 +32,11 @@ const User = sequelize.define('User', {
     allowNull: true,
     field: 'last_name'
   },
+  phone: {                          // ← زيدها هنا داخل الـ attributes
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    defaultValue: null
+  },
   role: {
     type: DataTypes.ENUM('user', 'admin'),
     defaultValue: 'user'
@@ -51,7 +56,6 @@ const User = sequelize.define('User', {
     allowNull: true,
     field: 'last_login_at'
   },
-  // ✅ ICI — dans le bon objet
   resetCode: {
     type: DataTypes.STRING(6),
     allowNull: true,
