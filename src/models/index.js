@@ -16,4 +16,22 @@ const sequelize = new Sequelize(
   }
 );
 
-module.exports = sequelize;
+const User = require('./user.model')(sequelize);
+const Bike = require('./bike.model')(sequelize);
+const BikeAssignment = require('./bikeAssignment.model')(sequelize);
+const Trip = require('./Trip')(sequelize);
+const TripUser = require('./TripUser')(sequelize);
+const TripTrackingPoint = require('./TripTrackingPoint')(sequelize);
+
+const models = { User, Bike, BikeAssignment, Trip, TripUser, TripTrackingPoint };
+
+Object.values(models).forEach(model => {
+  if (model.associate) {
+    model.associate(models);
+  }
+});
+
+module.exports = {
+  sequelize,
+  ...models
+};

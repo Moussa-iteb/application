@@ -1,4 +1,4 @@
-const User = require('../models/user.model');
+const { User } = require('../models/index');
 const { hashPassword, comparePassword } = require('../utils/hashPassword');
 const { generateToken } = require('../utils/generateToken');
 

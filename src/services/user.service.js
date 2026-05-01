@@ -1,7 +1,5 @@
 const bcrypt = require('bcrypt');
-const User = require('../models/user.model');
-const BikeAssignment = require('../models/bikeAssignment.model');
-const Bike = require('../models/bike.model');
+const { User, BikeAssignment, Bike } = require('../models/index');
 
 class UserService {
 

@@ -2,14 +2,14 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');  // ← AJOUTÉ
-const sequelize = require('./models/index');
+const { sequelize } = require('./models/index');
 const { port } = require('./config/config');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const bikeRoutes = require('./routes/bike.routes');
 const bikeAssignmentRoutes = require('./routes/bikeAssignment.routes');
 const { errorHandler, notFoundHandler } = require('./middleware/error.middleware');
-
+const tripRoutes = require('./routes/trip.routes');
 const app = express();
 
 // ===== CORS ===== (doit être AVANT tout le reste)
@@ -35,7 +35,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/bikes', bikeRoutes);
 app.use('/api/bike-assignments', bikeAssignmentRoutes);
-
+app.use('/api/trips', tripRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 

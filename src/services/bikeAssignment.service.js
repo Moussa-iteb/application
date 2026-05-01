@@ -1,6 +1,4 @@
-const BikeAssignment = require('../models/bikeAssignment.model');
-const Bike = require('../models/bike.model');
-const User = require('../models/user.model');
+const { BikeAssignment, Bike, User } = require('../models/index');
 
 class BikeAssignmentService {
 

@@ -1,6 +1,6 @@
-const Bike = require('../models/bike.model');
+const { Bike, BikeAssignment } = require('../models/index');
 const { Op } = require('sequelize');
-const BikeAssignment = require('../models/bikeAssignment.model');
+
 const bikeAssignmentService = require('./bikeAssignment.service');
 
 class BikeService {
