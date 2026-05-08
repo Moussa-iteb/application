@@ -64,7 +64,7 @@ class TripService {
 
   // ─── Scan QR ──────────────────────────────────────────────────────────────
 
-  async scanTripQr(tripId, userId) {
+  async scanTripQr(tripId, userId, bikeId = null) {
     const trip = await Trip.findByPk(tripId, {
       include: [{
         model: TripUser,
@@ -82,13 +82,53 @@ class TripService {
       throw err;
     }
 
-    if (!['planned', 'active'].includes(trip.status)) {
-      const err = new Error('Trip is not available');
+    if (trip.status === 'cancelled') {
+      const err = new Error('Trip is cancelled');
       err.status = 400;
       throw err;
     }
 
-    const tripUser = await TripUser.findOne({
+    // ✅ completed → امسح كل شيء قديم وابدأ من جديد
+    if (trip.status === 'completed') {
+      const oldTripUsers = await TripUser.findAll({ where: { trip_id: tripId } });
+      for (const tu of oldTripUsers) {
+        await TripTrackingPoint.destroy({ where: { trip_user_id: tu.id } });
+      }
+      await TripUser.destroy({ where: { trip_id: tripId } });
+
+      await trip.update({
+        status:      'active',
+        ended_at:    null,
+        started_at:  new Date(),
+        distance_km: 0
+      });
+
+      const bikeExists = bikeId ? await Bike.findByPk(bikeId) : null;
+      const newTripUser = await TripUser.create({
+        trip_id:   tripId,
+        user_id:   userId,
+        bike_id:   bikeExists ? bikeId : null,
+        status:    'confirmed',
+        joined_at: new Date()
+      });
+
+      return {
+        tripUserId: newTripUser.id,
+        tripId:     trip.id,
+        bikeId:     newTripUser.bike_id,
+        bike:       bikeExists || null,
+        startLat:   trip.start_point_lat,
+        startLng:   trip.start_point_lng,
+        startedAt:  new Date()
+      };
+    }
+
+    // ✅ planned → active
+    if (trip.status === 'planned') {
+      await trip.update({ status: 'active', started_at: new Date() });
+    }
+
+    let tripUser = await TripUser.findOne({
       where: { trip_id: tripId, user_id: userId },
       include: [{ model: Bike, as: 'bike' }]
     });
@@ -99,11 +139,12 @@ class TripService {
       throw err;
     }
 
-    if (trip.status === 'planned') {
-      await trip.update({ status: 'active', started_at: new Date() });
-    }
-
     await tripUser.update({ status: 'confirmed', joined_at: new Date() });
+
+    tripUser = await TripUser.findOne({
+      where: { trip_id: tripId, user_id: userId },
+      include: [{ model: Bike, as: 'bike' }]
+    });
 
     return {
       tripUserId: tripUser.id,
@@ -144,12 +185,19 @@ class TripService {
     const trip = await Trip.findByPk(tripId);
     if (!trip) throw new Error('Trip not found');
 
-    // ✅ نسمح بـ active أيضاً — إذا scan QR غيّره بالفعل
-    if (!['planned', 'active'].includes(trip.status)) {
-      throw new Error(`Cannot start trip with status: ${trip.status}`);
+    if (trip.status === 'cancelled') {
+      throw new Error('Cannot restart cancelled trip');
     }
 
-    await trip.update({ status: 'active', started_at: trip.started_at || new Date() });
+    if (trip.status === 'active') {
+      return trip;
+    }
+
+    await trip.update({
+      status:     'active',
+      started_at: trip.started_at || new Date(),
+      ended_at:   null
+    });
     return trip;
   }
 
@@ -159,16 +207,15 @@ class TripService {
     const trip = await Trip.findByPk(tripId);
     if (!trip) throw new Error('Trip not found');
 
-    // ✅ حساب المسافة
     const distance = await this.calculateTripDistance(tripId);
     console.log('Distance calculée:', distance);
 
     await trip.update({
       status:        'completed',
       ended_at:      new Date(),
-      end_point_lat: endLat  || null,
-      end_point_lng: endLng  || null,
-      distance_km:   distance
+      end_point_lat: endLat || null,
+      end_point_lng: endLng || null,
+      distance_km:   parseFloat(distance.toFixed(4))
     });
 
     await TripUser.update(
@@ -183,7 +230,6 @@ class TripService {
 
   async addTrackingPoint(tripUserId, data) {
     try {
-      // ✅ Vérifier que tripUser existe
       const tripUser = await TripUser.findByPk(tripUserId);
       if (!tripUser) {
         const err = new Error(`TripUser #${tripUserId} not found`);
@@ -218,8 +264,8 @@ class TripService {
       include: [{
         model:    TripTrackingPoint,
         as:       'trackingPoints',
-        separate: true,                      // ✅ مطلوب لـ order يشتغل
-        order:    [['recorded_at', 'ASC']]   // ✅ ترتيب صحيح
+        separate: true,
+        order:    [['recorded_at', 'ASC']]
       }]
     });
 
@@ -232,30 +278,21 @@ class TripService {
       console.log(`  TripUser #${tripUser.id}: ${points.length} points`);
 
       for (let i = 1; i < points.length; i++) {
-        // ✅ parseFloat يضمن أنها أرقام حتى لو محفوظة كـ string
         const lat1 = parseFloat(points[i - 1].latitude);
         const lng1 = parseFloat(points[i - 1].longitude);
         const lat2 = parseFloat(points[i].latitude);
         const lng2 = parseFloat(points[i].longitude);
 
-        // ✅ تجاهل النقاط غير الصحيحة
-        if (isNaN(lat1) || isNaN(lng1) || isNaN(lat2) || isNaN(lng2)) {
-          console.warn(`  Skipping invalid point pair ${i - 1}→${i}`);
-          continue;
-        }
-
-        // ✅ تجاهل نقطتين متطابقتين تماماً
-        if (lat1 === lat2 && lng1 === lng2) {
-          continue;
-        }
+        if (isNaN(lat1) || isNaN(lng1) || isNaN(lat2) || isNaN(lng2)) continue;
+        if (lat1 === lat2 && lng1 === lng2) continue;
 
         const d = this.haversineDistance(lat1, lng1, lat2, lng2);
-        console.log(`  Point ${i - 1}→${i}: (${lat1},${lng1})→(${lat2},${lng2}) = ${d.toFixed(4)} km`);
+        console.log(`  Point ${i-1}→${i}: (${lat1},${lng1})→(${lat2},${lng2}) = ${d.toFixed(4)} km`);
         totalDistance += d;
       }
     }
 
-    const result = Math.round(totalDistance * 100) / 100;
+    const result = Math.round(totalDistance * 10000) / 10000;
     console.log('Total distance:', result, 'km');
     return result;
   }
@@ -326,7 +363,6 @@ class TripService {
     const trip = await Trip.findByPk(id);
     if (!trip) throw { status: 404, message: 'Trip not found' };
 
-    // ✅ حذف tracking points أولاً ثم tripUsers ثم trip
     const tripUsers = await TripUser.findAll({ where: { trip_id: id } });
     for (const tu of tripUsers) {
       await TripTrackingPoint.destroy({ where: { trip_user_id: tu.id } });

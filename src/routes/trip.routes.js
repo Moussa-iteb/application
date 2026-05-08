@@ -39,7 +39,8 @@ router.post('/:tripId/scan', authenticate, async (req, res, next) => {
   try {
     const result = await tripService.scanTripQr(
       req.params.tripId,
-      req.user.id  // ← vient du token JWT
+      req.user.id,
+      req.body.bikeId  // ✅ أضف هذا
     );
     res.json({ success: true, data: result });
   } catch (error) {
