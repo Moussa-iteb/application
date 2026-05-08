@@ -41,7 +41,7 @@ app.use(errorHandler);
 
 const startServer = async () => {
   try {
-    await sequelize.sync({ alter: true });
+    await sequelize.sync({ alter: false });
     console.log('✅ Database connected and synced');
 
     app.listen(port, '0.0.0.0', () => {

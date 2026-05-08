@@ -1,60 +1,174 @@
+const QRCode = require('qrcode');
 const { Trip, TripUser, TripTrackingPoint, User, Bike } = require('../models');
-const { Op } = require('sequelize');
 
 class TripService {
 
-  // ✅ Créer un trip
+  // ─── Create Trip ──────────────────────────────────────────────────────────
+
   async createTrip(data) {
     const trip = await Trip.create({
       start_point_lat: data.start_point_lat,
       start_point_lng: data.start_point_lng,
-      scheduled_at: data.scheduled_at,
-      status: 'planned'
+      scheduled_at:    data.scheduled_at,
+      status:          'planned'
     });
+
+    const qrData = JSON.stringify({
+      tripId:      trip.id,
+      startLat:    data.start_point_lat,
+      startLng:    data.start_point_lng,
+      scheduledAt: data.scheduled_at
+    });
+
+    const qrCodeUrl = await QRCode.toDataURL(qrData, {
+      width: 300, margin: 2,
+      color: { dark: '#1a8a4a', light: '#ffffff' }
+    });
+
+    await trip.update({ qr_code: qrCodeUrl });
     return trip;
   }
 
-  // ✅ Ajouter user + bike à un trip
+  // ─── Add User to Trip ─────────────────────────────────────────────────────
+
   async addUserToTrip(tripId, userId, bikeId) {
-    const tripUser = await TripUser.create({
-      trip_id: tripId,
-      user_id: userId,
-      bike_id: bikeId,
-      status: 'confirmed',
-      joined_at: new Date()
-    });
-    return tripUser;
+    try {
+      const existing = await TripUser.findOne({
+        where: { trip_id: tripId, user_id: userId }
+      });
+
+      if (existing) {
+        const err = new Error('User already in this trip');
+        err.status = 409;
+        throw err;
+      }
+
+      const bikeExists = bikeId ? await Bike.findByPk(bikeId) : null;
+      const finalBikeId = bikeExists ? bikeId : null;
+
+      const tripUser = await TripUser.create({
+        trip_id:   tripId,
+        user_id:   userId,
+        bike_id:   finalBikeId,
+        status:    'confirmed',
+        joined_at: new Date()
+      });
+
+      return tripUser;
+    } catch (err) {
+      console.error('TripUser.create error:', err.message);
+      console.error('Original error:', err.original?.message);
+      throw err;
+    }
   }
 
-  // ✅ Démarrer un trip
+  // ─── Scan QR ──────────────────────────────────────────────────────────────
+
+  async scanTripQr(tripId, userId) {
+    const trip = await Trip.findByPk(tripId, {
+      include: [{
+        model: TripUser,
+        as:    'tripUsers',
+        include: [
+          { model: User, as: 'user' },
+          { model: Bike, as: 'bike' }
+        ]
+      }]
+    });
+
+    if (!trip) {
+      const err = new Error('Trip not found');
+      err.status = 404;
+      throw err;
+    }
+
+    if (!['planned', 'active'].includes(trip.status)) {
+      const err = new Error('Trip is not available');
+      err.status = 400;
+      throw err;
+    }
+
+    const tripUser = await TripUser.findOne({
+      where: { trip_id: tripId, user_id: userId },
+      include: [{ model: Bike, as: 'bike' }]
+    });
+
+    if (!tripUser) {
+      const err = new Error('You are not assigned to this trip');
+      err.status = 403;
+      throw err;
+    }
+
+    if (trip.status === 'planned') {
+      await trip.update({ status: 'active', started_at: new Date() });
+    }
+
+    await tripUser.update({ status: 'confirmed', joined_at: new Date() });
+
+    return {
+      tripUserId: tripUser.id,
+      tripId:     trip.id,
+      bikeId:     tripUser.bike_id,
+      bike:       tripUser.bike,
+      startLat:   trip.start_point_lat,
+      startLng:   trip.start_point_lng,
+      startedAt:  trip.started_at
+    };
+  }
+
+  // ─── Generate QR ──────────────────────────────────────────────────────────
+
+  async generateQrCode(tripId) {
+    const trip = await Trip.findByPk(tripId);
+    if (!trip) throw { status: 404, message: 'Trip not found' };
+
+    const qrData = JSON.stringify({
+      tripId:      trip.id,
+      startLat:    trip.start_point_lat,
+      startLng:    trip.start_point_lng,
+      scheduledAt: trip.scheduled_at
+    });
+
+    const qrCodeUrl = await QRCode.toDataURL(qrData, {
+      width: 300, margin: 2,
+      color: { dark: '#1a8a4a', light: '#ffffff' }
+    });
+
+    await trip.update({ qr_code: qrCodeUrl });
+    return trip;
+  }
+
+  // ─── Start Trip ───────────────────────────────────────────────────────────
+
   async startTrip(tripId) {
     const trip = await Trip.findByPk(tripId);
     if (!trip) throw new Error('Trip not found');
-    if (trip.status !== 'planned') throw new Error('Trip already started');
 
-    await trip.update({
-      status: 'active',
-      started_at: new Date()
-    });
+    // ✅ نسمح بـ active أيضاً — إذا scan QR غيّره بالفعل
+    if (!['planned', 'active'].includes(trip.status)) {
+      throw new Error(`Cannot start trip with status: ${trip.status}`);
+    }
 
+    await trip.update({ status: 'active', started_at: trip.started_at || new Date() });
     return trip;
   }
 
-  // ✅ Terminer un trip
+  // ─── End Trip ─────────────────────────────────────────────────────────────
+
   async endTrip(tripId, endLat, endLng) {
     const trip = await Trip.findByPk(tripId);
     if (!trip) throw new Error('Trip not found');
 
-    // ✅ Calculer distance avant de terminer
+    // ✅ حساب المسافة
     const distance = await this.calculateTripDistance(tripId);
-    console.log('Distance calculée:', distance); // ← ajoute ce log
+    console.log('Distance calculée:', distance);
 
     await trip.update({
-      status: 'completed',
-      ended_at: new Date(),
-      end_point_lat: endLat,
-      end_point_lng: endLng,
-      distance_km: distance
+      status:        'completed',
+      ended_at:      new Date(),
+      end_point_lat: endLat  || null,
+      end_point_lng: endLng  || null,
+      distance_km:   distance
     });
 
     await TripUser.update(
@@ -63,104 +177,167 @@ class TripService {
     );
 
     return trip;
-}
-
-  // ✅ Ajouter point GPS
-  async addTrackingPoint(tripUserId, data) {
-  try {
-    const point = await TripTrackingPoint.create({
-      trip_user_id: tripUserId,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      recorded_at: new Date(),
-      speed_kmh: data.speed_kmh || null,
-      battery_level: data.battery_level || null,
-      synced: false
-    });
-    return point;
-  } catch (error) {
-    console.error('TRACKING ERROR:', error.message);
-    console.error('DETAIL:', error.original?.detail);
-    throw error;
   }
-}
 
-  // ✅ Calculer distance via points GPS
+  // ─── Add Tracking Point ───────────────────────────────────────────────────
+
+  async addTrackingPoint(tripUserId, data) {
+    try {
+      // ✅ Vérifier que tripUser existe
+      const tripUser = await TripUser.findByPk(tripUserId);
+      if (!tripUser) {
+        const err = new Error(`TripUser #${tripUserId} not found`);
+        err.status = 404;
+        throw err;
+      }
+
+      const point = await TripTrackingPoint.create({
+        trip_user_id:  tripUserId,
+        latitude:      parseFloat(data.latitude),
+        longitude:     parseFloat(data.longitude),
+        recorded_at:   new Date(),
+        speed_kmh:     data.speed_kmh     || null,
+        battery_level: data.battery_level || null,
+        synced:        false
+      });
+
+      console.log(`TRACKING: tripUser=${tripUserId} lat=${data.latitude} lng=${data.longitude}`);
+      return point;
+    } catch (error) {
+      console.error('TRACKING ERROR:', error.message);
+      console.error('DETAIL:', error.original?.detail);
+      throw error;
+    }
+  }
+
+  // ─── Calculate Distance ───────────────────────────────────────────────────
+
   async calculateTripDistance(tripId) {
     const tripUsers = await TripUser.findAll({
       where: { trip_id: tripId },
       include: [{
-        model: TripTrackingPoint,
-        as: 'trackingPoints',
-        order: [['recorded_at', 'ASC']]
+        model:    TripTrackingPoint,
+        as:       'trackingPoints',
+        separate: true,                      // ✅ مطلوب لـ order يشتغل
+        order:    [['recorded_at', 'ASC']]   // ✅ ترتيب صحيح
       }]
     });
 
     console.log('TripUsers found:', tripUsers.length);
-    console.log('Points:', tripUsers[0]?.trackingPoints?.length);
 
     let totalDistance = 0;
+
     for (const tripUser of tripUsers) {
-      const points = tripUser.trackingPoints;
+      const points = tripUser.trackingPoints || [];
+      console.log(`  TripUser #${tripUser.id}: ${points.length} points`);
+
       for (let i = 1; i < points.length; i++) {
-        totalDistance += this.haversineDistance(
-          points[i-1].latitude, points[i-1].longitude,
-          points[i].latitude, points[i].longitude
-        );
+        // ✅ parseFloat يضمن أنها أرقام حتى لو محفوظة كـ string
+        const lat1 = parseFloat(points[i - 1].latitude);
+        const lng1 = parseFloat(points[i - 1].longitude);
+        const lat2 = parseFloat(points[i].latitude);
+        const lng2 = parseFloat(points[i].longitude);
+
+        // ✅ تجاهل النقاط غير الصحيحة
+        if (isNaN(lat1) || isNaN(lng1) || isNaN(lat2) || isNaN(lng2)) {
+          console.warn(`  Skipping invalid point pair ${i - 1}→${i}`);
+          continue;
+        }
+
+        // ✅ تجاهل نقطتين متطابقتين تماماً
+        if (lat1 === lat2 && lng1 === lng2) {
+          continue;
+        }
+
+        const d = this.haversineDistance(lat1, lng1, lat2, lng2);
+        console.log(`  Point ${i - 1}→${i}: (${lat1},${lng1})→(${lat2},${lng2}) = ${d.toFixed(4)} km`);
+        totalDistance += d;
       }
     }
-    return Math.round(totalDistance * 100) / 100;
-}
-  // ✅ Formule Haversine — distance entre 2 points GPS
+
+    const result = Math.round(totalDistance * 100) / 100;
+    console.log('Total distance:', result, 'km');
+    return result;
+  }
+
+  // ─── Haversine Formula ────────────────────────────────────────────────────
+
   haversineDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Rayon de la Terre en km
+    const R    = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a =
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
 
-  // ✅ Get trip avec tous les détails
+  // ─── Get Details ──────────────────────────────────────────────────────────
+
   async getTripDetails(tripId) {
     return await Trip.findByPk(tripId, {
-      include: [
-        {
-          model: TripUser,
-          as: 'tripUsers',
-          include: [
-            { model: User, as: 'user', attributes: ['id', 'username', 'email'] },
-            { model: Bike, as: 'bike', attributes: ['id', 'model', 'brand', 'batteryLevel'] },
-            {
-              model: TripTrackingPoint,
-              as: 'trackingPoints',
-              order: [['recorded_at', 'ASC']]
-            }
-          ]
-        }
-      ]
+      include: [{
+        model: TripUser,
+        as:    'tripUsers',
+        include: [
+          { model: User,              as: 'user',           attributes: ['id', 'username', 'email'] },
+          { model: Bike,              as: 'bike',           attributes: ['id', 'model', 'brand', 'batteryLevel'] },
+          { model: TripTrackingPoint, as: 'trackingPoints', separate: true, order: [['recorded_at', 'ASC']] }
+        ]
+      }]
     });
   }
 
-  // ✅ Get trips d'un user
-  async getUserTrips(userId) {
+  // ─── Get All Trips ────────────────────────────────────────────────────────
+
+  async getAllTrips() {
     return await Trip.findAll({
       include: [{
         model: TripUser,
-        as: 'tripUsers',
-        where: { user_id: userId },
+        as:    'tripUsers',
         include: [
-          { model: Bike, as: 'bike' }
+          { model: User, as: 'user', attributes: ['id', 'username', 'email'] },
+          { model: Bike, as: 'bike', attributes: ['id', 'model', 'brand'] }
         ]
       }],
       order: [['created_at', 'DESC']]
     });
   }
 
-  // ✅ Sync points offline
+  // ─── Get User Trips ───────────────────────────────────────────────────────
+
+  async getUserTrips(userId) {
+    return await Trip.findAll({
+      include: [{
+        model: TripUser,
+        as:    'tripUsers',
+        where: { user_id: userId },
+        include: [{ model: Bike, as: 'bike' }]
+      }],
+      order: [['created_at', 'DESC']]
+    });
+  }
+
+  // ─── Delete Trip ──────────────────────────────────────────────────────────
+
+  async deleteTrip(id) {
+    const trip = await Trip.findByPk(id);
+    if (!trip) throw { status: 404, message: 'Trip not found' };
+
+    // ✅ حذف tracking points أولاً ثم tripUsers ثم trip
+    const tripUsers = await TripUser.findAll({ where: { trip_id: id } });
+    for (const tu of tripUsers) {
+      await TripTrackingPoint.destroy({ where: { trip_user_id: tu.id } });
+    }
+    await TripUser.destroy({ where: { trip_id: id } });
+    await trip.destroy();
+    return true;
+  }
+
+  // ─── Sync Offline Points ──────────────────────────────────────────────────
+
   async syncTrackingPoints(points) {
     const created = await TripTrackingPoint.bulkCreate(points, {
       ignoreDuplicates: true
@@ -174,7 +351,8 @@ class TripService {
     return created;
   }
 
-  // ✅ Annuler un trip
+  // ─── Cancel Trip ──────────────────────────────────────────────────────────
+
   async cancelTrip(tripId) {
     await Trip.update(
       { status: 'cancelled' },

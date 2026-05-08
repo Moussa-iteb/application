@@ -1,4 +1,5 @@
-const { Bike, BikeAssignment } = require('../models/index');
+const { Bike, BikeAssignment, TripUser } = require('../models/index');
+
 const { Op } = require('sequelize');
 
 const bikeAssignmentService = require('./bikeAssignment.service');
@@ -59,15 +60,23 @@ class BikeService {
   }
 
   async deleteBike(id) {
-    const bike = await Bike.findByPk(id);
-    if (!bike) {
-      throw { status: 404, message: 'Bike not found' };
-    }
-    await bike.destroy();
-    return { message: 'Bike deleted successfully' };
+  const bike = await Bike.findByPk(id);
+  if (!bike) {
+    throw { status: 404, message: 'Bike not found' };
   }
 
-  // ← نسخة واحدة فقط — 'Available' بحرف كبير
+  try {
+    // ✅ snake_case — nom réel de la colonne en DB
+    if (TripUser) await TripUser.destroy({ where: { bike_id: id } });
+    if (BikeAssignment) await BikeAssignment.destroy({ where: { bike_id: id } });
+    await bike.destroy();
+    return { message: 'Bike deleted successfully' };
+  } catch (err) {
+    console.error('DELETE BIKE ERROR:', err.message, err.parent?.detail);
+    throw { status: 500, message: err.message };
+  }
+}
+
   async getAvailableBikes() {
     const bikes = await Bike.findAll({
       where: { 
@@ -81,36 +90,48 @@ class BikeService {
   }
 
   async scanBike(qrCode, userId) {
-    console.log('QR Code received:', qrCode);
-    const bike = await Bike.findOne({ where: { qrCode } });
+  // ✅ Parse le JSON du QR code
+  let bikeId;
+  try {
+    const parsed = JSON.parse(qrCode);
+    bikeId = parsed.bikeId;
+  } catch (e) {
+    throw { status: 400, message: 'Invalid QR code format' };
+  }
 
-    if (!bike) {
-        throw { status: 404, message: 'Bike not available' };
-    }
+  // ✅ Cherche par ID au lieu de qrCode string
+  const bike = await Bike.findByPk(bikeId);
 
-    if (bike.status !== 'Available') {
-        throw { status: 400, message: 'Bike is not available' };
-    }
+  if (!bike) {
+    throw { status: 404, message: 'Bike not found' };
+  }
 
-    const existingUserAssignment = await BikeAssignment.findOne({
-        where: { userId, status: 'active' }
-    });
+  if (bike.status !== 'Available') {
+    throw { status: 400, message: 'Bike is not available' };
+  }
 
-    if (existingUserAssignment) {
-        throw { status: 400, message: 'You already have an active bike' };
-    }
+  const existingUserAssignment = await BikeAssignment.findOne({
+    where: { userId, status: 'active' }
+  });
+  if (existingUserAssignment) {
+    throw { status: 400, message: 'You already have an active bike' };
+  }
 
-    const assignment = await bikeAssignmentService.assignBike({
-        userId,
-        bikeId: bike.id,
-        assignedBy: userId
-    });
+  const existingBikeAssignment = await BikeAssignment.findOne({
+    where: { bikeId: bike.id, status: 'active' }
+  });
+  if (existingBikeAssignment) {
+    throw { status: 400, message: 'Bike is already assigned to another user' };
+  }
 
-    // ← reload bike بعد update
-    await bike.reload();
+  const assignment = await bikeAssignmentService.assignBike({
+    userId,
+    bikeId: bike.id,
+    assignedBy: userId
+  });
 
-    return { bike, assignment };
-}
-}
+  await bike.reload();
+  return { bike, assignment };
+}}
 
 module.exports = new BikeService();

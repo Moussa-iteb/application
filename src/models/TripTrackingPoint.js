@@ -12,22 +12,37 @@ module.exports = (sequelize) => {
       allowNull: false,
       references: { model: 'trip_users', key: 'id' }
     },
+
+    // ✅ FLOAT بدل DECIMAL — يرجع number مباشرة مش string
     latitude: {
-      type: DataTypes.DECIMAL(10, 8),
-      allowNull: false
+      type: DataTypes.FLOAT,
+      allowNull: false,
+      get() {
+        const val = this.getDataValue('latitude');
+        return val !== null && val !== undefined ? parseFloat(val) : null;
+      }
     },
     longitude: {
-      type: DataTypes.DECIMAL(11, 8),
-      allowNull: false
+      type: DataTypes.FLOAT,
+      allowNull: false,
+      get() {
+        const val = this.getDataValue('longitude');
+        return val !== null && val !== undefined ? parseFloat(val) : null;
+      }
     },
+
     recorded_at: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW
     },
     speed_kmh: {
-      type: DataTypes.DECIMAL(5, 2),
-      allowNull: true
+      type: DataTypes.FLOAT,
+      allowNull: true,
+      get() {
+        const val = this.getDataValue('speed_kmh');
+        return val !== null && val !== undefined ? parseFloat(val) : null;
+      }
     },
     battery_level: {
       type: DataTypes.INTEGER,

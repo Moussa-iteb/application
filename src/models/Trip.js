@@ -11,6 +11,10 @@ module.exports = (sequelize) => {
       type: DataTypes.DECIMAL(10, 8),
       allowNull: false
     },
+    qr_code: {
+  type: DataTypes.STRING,
+  allowNull: true
+},
     start_point_lng: {
       type: DataTypes.DECIMAL(11, 8),
       allowNull: false

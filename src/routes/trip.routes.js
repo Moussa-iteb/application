@@ -11,16 +11,52 @@ router.post('/', authenticate, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-// Ajouter user + bike au trip
 router.post('/:tripId/users', authenticate, async (req, res, next) => {
   try {
     const { user_id, bike_id } = req.body;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'user_id is required'
+      });
+    }
+
     const tripUser = await tripService.addUserToTrip(
       req.params.tripId,
       user_id,
-      bike_id
+      bike_id || null
     );
-    res.status(201).json({ success: true, data: tripUser });
+
+    // ✅ 200 si déjà existant, 201 si nouveau
+    res.status(200).json({ success: true, data: tripUser });
+  } catch (error) {
+    next(error);
+  }
+});
+// ✅ User scanne le QR code du trip
+router.post('/:tripId/scan', authenticate, async (req, res, next) => {
+  try {
+    const result = await tripService.scanTripQr(
+      req.params.tripId,
+      req.user.id  // ← vient du token JWT
+    );
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({
+        success: false,
+        message: error.message
+      });
+    }
+    next(error);
+  }
+});
+// ✅ Générer/Régénérer QR code d'un trip
+router.post('/:id/qrcode', authenticate, async (req, res, next) => {
+  try {
+    const trip = await tripService.generateQrCode(req.params.id);
+    res.json({ success: true, data: { qr_code: trip.qr_code } });
   } catch (error) { next(error); }
 });
 
@@ -49,11 +85,20 @@ router.post('/tracking/:tripUserId', authenticate, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-// Get détails trip
-router.get('/:id', authenticate, async (req, res, next) => {
+// Sync offline points
+router.post('/sync/tracking', authenticate, async (req, res, next) => {
   try {
-    const trip = await tripService.getTripDetails(req.params.id);
-    res.json({ success: true, data: trip });
+    const { points } = req.body;
+    const synced = await tripService.syncTrackingPoints(points);
+    res.json({ success: true, data: synced });
+  } catch (error) { next(error); }
+});
+
+// Get all trips
+router.get('/', authenticate, async (req, res, next) => {
+  try {
+    const trips = await tripService.getAllTrips();
+    res.json({ success: true, data: trips });
   } catch (error) { next(error); }
 });
 
@@ -65,12 +110,19 @@ router.get('/user/:userId', authenticate, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-// Sync offline points
-router.post('/sync/tracking', authenticate, async (req, res, next) => {
+// Get détails trip
+router.get('/:id', authenticate, async (req, res, next) => {
   try {
-    const { points } = req.body;
-    const synced = await tripService.syncTrackingPoints(points);
-    res.json({ success: true, data: synced });
+    const trip = await tripService.getTripDetails(req.params.id);
+    res.json({ success: true, data: trip });
+  } catch (error) { next(error); }
+});
+
+// Delete trip
+router.delete('/:id', authenticate, async (req, res, next) => {
+  try {
+    await tripService.deleteTrip(req.params.id);
+    res.json({ success: true, message: 'Trip deleted successfully' });
   } catch (error) { next(error); }
 });
 

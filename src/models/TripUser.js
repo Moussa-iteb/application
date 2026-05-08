@@ -18,10 +18,10 @@ module.exports = (sequelize) => {
       references: { model: 'users', key: 'id' }
     },
     bike_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: { model: 'bikes', key: 'id' }
-    },
+    type: DataTypes.INTEGER,
+    allowNull: true,   // ✅ كان false
+    references: { model: 'bikes', key: 'id' }
+},
     status: {
       type: DataTypes.ENUM('invited', 'confirmed', 'cancelled'),
       defaultValue: 'invited'

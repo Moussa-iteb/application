@@ -15,5 +15,5 @@ router.get('/user/:userId',     authenticate, bikeAssignmentController.getUserAs
 // ← routes بـ :id أخيراً
 router.put('/:id/return',       authenticate, bikeAssignmentController.returnBike);
 router.delete('/:id',           authenticate, bikeAssignmentController.deleteAssignment);
-
+router.post('/scan',            authenticate, bikeAssignmentController.scanAndAssignBike);
 module.exports = router;
