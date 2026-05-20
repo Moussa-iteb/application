@@ -9,15 +9,11 @@ module.exports = (sequelize) => {
     },
     start_point_lat: {
       type: DataTypes.DECIMAL(10, 8),
-      allowNull: false
+      allowNull: true   // ✅ null — pas obligatoire à la création
     },
-    qr_code: {
-  type: DataTypes.STRING,
-  allowNull: true
-},
     start_point_lng: {
       type: DataTypes.DECIMAL(11, 8),
-      allowNull: false
+      allowNull: true   // ✅ null
     },
     end_point_lat: {
       type: DataTypes.DECIMAL(10, 8),
@@ -25,6 +21,15 @@ module.exports = (sequelize) => {
     },
     end_point_lng: {
       type: DataTypes.DECIMAL(11, 8),
+      allowNull: true
+    },
+    // ✅ Nouveaux champs adresse
+    start_address: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
+    destination_address: {
+      type: DataTypes.STRING(255),
       allowNull: true
     },
     scheduled_at: {
@@ -44,8 +49,12 @@ module.exports = (sequelize) => {
       defaultValue: 'planned'
     },
     distance_km: {
-      type: DataTypes.DECIMAL(8, 2),
+      type: DataTypes.DECIMAL(10, 4),  // ✅ 4 décimales
       defaultValue: 0
+    },
+    qr_code: {
+      type: DataTypes.TEXT,
+      allowNull: true
     },
     created_at: {
       type: DataTypes.DATE,
@@ -56,23 +65,17 @@ module.exports = (sequelize) => {
     timestamps: false
   });
 
-  // ✅ Relations
   Trip.associate = (models) => {
-    // Trip → TripUser (one to many)
     Trip.hasMany(models.TripUser, {
       foreignKey: 'trip_id',
       as: 'tripUsers'
     });
-
-    // Trip → Users via TripUser (many to many)
     Trip.belongsToMany(models.User, {
       through: models.TripUser,
       foreignKey: 'trip_id',
       otherKey: 'user_id',
       as: 'users'
     });
-
-    // Trip → Bikes via TripUser (many to many)
     Trip.belongsToMany(models.Bike, {
       through: models.TripUser,
       foreignKey: 'trip_id',

@@ -102,28 +102,27 @@ class BikeAssignmentController {
   }
 
   async assignBike(req, res, next) {
-    try {
-      const { userId, bikeId } = req.body;
-      const assignedBy = req.user.id;
+  try {
+    const { userId, bikeId, tripId } = req.body;  // ✅ ajoute tripId
+    const assignedBy = req.user.id;
 
-      const result = await bikeAssignmentService.assignBike({
-        userId, bikeId, assignedBy
-      });
+    const result = await bikeAssignmentService.assignBike({
+      userId, bikeId, assignedBy, tripId  // ✅ passe tripId
+    });
 
-      return res.status(201).json({
-        success: true,
-        message: 'Bike assigned successfully',
-        data: {
-          assignment: result.assignment,
-          trip: result.trip,
-          qrCode: result.qrCode
-        }
-      });
-    } catch (error) {
-      next(error);
-    }
+    return res.status(201).json({
+      success: true,
+      message: 'Bike assigned successfully',
+      data: {
+        assignment: result.assignment,
+        trip: result.trip,
+        qrCode: result.qrCode
+      }
+    });
+  } catch (error) {
+    next(error);
   }
-
+}
   async scanAndAssignBike(req, res, next) {
     try {
       const { qrCode } = req.body;

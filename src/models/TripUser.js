@@ -23,9 +23,9 @@ module.exports = (sequelize) => {
     references: { model: 'bikes', key: 'id' }
 },
     status: {
-      type: DataTypes.ENUM('invited', 'confirmed', 'cancelled'),
-      defaultValue: 'invited'
-    },
+  type: DataTypes.ENUM('start', 'active', 'completed', 'cancelled'),
+  defaultValue: 'start'
+},
     joined_at: {
       type: DataTypes.DATE,
       allowNull: true

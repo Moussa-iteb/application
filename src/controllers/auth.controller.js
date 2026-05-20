@@ -1,6 +1,6 @@
 const authService = require('../services/auth.service');
 const { sendResetCode } = require('../services/email.service');
-const User = require('../models/user.model');
+const { User } = require('../models'); // ✅ fix ici
 const bcrypt = require('bcrypt');
 
 class AuthController {
@@ -9,8 +9,9 @@ class AuthController {
   async register(req, res, next) {
     try {
       const { username, email, password, firstName, lastName } = req.body;
-      const result = await authService.register({ username, email, password, firstName, lastName });
-
+      const result = await authService.register({
+        username, email, password, firstName, lastName
+      });
       return res.status(201).json({
         success: true,
         message: 'User registered successfully',
@@ -26,7 +27,6 @@ class AuthController {
     try {
       const { email, password } = req.body;
       const result = await authService.login({ email, password });
-
       return res.status(200).json({
         success: true,
         message: 'Login successful',
@@ -42,7 +42,6 @@ class AuthController {
     try {
       const { email, password } = req.body;
       const result = await authService.loginUser({ email, password });
-
       return res.status(200).json({
         success: true,
         message: 'Login successful',
@@ -57,7 +56,6 @@ class AuthController {
   async getProfile(req, res, next) {
     try {
       const user = await authService.getProfile(req.user.id);
-
       return res.status(200).json({
         success: true,
         data: { user }
@@ -144,7 +142,6 @@ class AuthController {
         return res.status(404).json({ message: 'Email not found' });
       }
 
-      // users seulement — pas admin
       if (user.role === 'admin') {
         return res.status(403).json({ message: 'Access denied.' });
       }
@@ -169,7 +166,6 @@ class AuthController {
       const user = await User.findOne({ where: { email } });
       if (!user) return res.status(404).json({ message: 'User not found' });
 
-      // users seulement — pas admin
       if (user.role === 'admin') {
         return res.status(403).json({ message: 'Access denied.' });
       }
