@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
-const cors = require('cors');  // ← AJOUTÉ
+const cors = require('cors');
 const { sequelize } = require('./models/index');
 const { port } = require('./config/config');
 const authRoutes = require('./routes/auth.routes');
@@ -10,16 +10,12 @@ const bikeRoutes = require('./routes/bike.routes');
 const bikeAssignmentRoutes = require('./routes/bikeAssignment.routes');
 const { errorHandler, notFoundHandler } = require('./middleware/error.middleware');
 const tripRoutes = require('./routes/trip.routes');
+
 const app = express();
 
-// ===== CORS ===== (doit être AVANT tout le reste)
+// ===== CORS =====
 app.use(cors({
-  origin: [
-    'http://localhost:4200',
-    'http://10.26.13.35:4200',
-    'http://192.168.1.25:4200'
-  ],
-  credentials: true,
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -46,21 +42,6 @@ const startServer = async () => {
 
     app.listen(port, '0.0.0.0', () => {
       console.log(`🚀 Server running on http://localhost:${port}`);
-      console.log(`   POST   /api/auth/register`);
-      console.log(`   POST   /api/auth/login`);
-      console.log(`   GET    /api/auth/me        (protected)`);
-      console.log(`   GET    /api/users           (protected)`);
-      console.log(`   DELETE /api/users/:id       (protected)`);
-      console.log(`   POST   /api/bikes           (protected)`);
-      console.log(`   GET    /api/bikes           (protected)`);
-      console.log(`   GET    /api/bikes/:id       (protected)`);
-      console.log(`   PUT    /api/bikes/:id       (protected)`);
-      console.log(`   DELETE /api/bikes/:id       (protected)`);
-      console.log(`   POST   /api/bike-assignments           (protected)`);
-      console.log(`   GET    /api/bike-assignments           (protected)`);
-      console.log(`   GET    /api/bike-assignments/user/:id  (protected)`);
-      console.log(`   PUT    /api/bike-assignments/:id/return(protected)`);
-      console.log(`   DELETE /api/bike-assignments/:id       (protected)`);
     });
   } catch (error) {
     console.error('❌ Failed to start:', error.message);
