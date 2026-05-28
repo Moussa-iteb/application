@@ -70,7 +70,15 @@ class UserService {
     await user.reload();
     return user;
   }
-
+async updateUser(id, data) {
+  const user = await User.findByPk(id);
+  if (!user) throw new Error('User not found');
+  
+  const { username, email, phone } = data;
+  
+  await user.update({ username, email, phone });
+  return user;
+}
   // DELETE USER
   async deleteUser(id) {
     const user = await User.findByPk(id);
