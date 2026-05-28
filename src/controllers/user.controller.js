@@ -69,6 +69,25 @@ async changePassword(req, res) {
     res.status(err.status || 500).json({ message: err.message });
   }
 }
+async uploadPhoto(req, res, next) {
+    try {
+        const file = req.file;
+        if (!file) return res.status(400).json({ message: 'No file uploaded' });
+
+        const base64 = file.buffer.toString('base64');
+        const photoUrl = `data:${file.mimetype};base64,${base64}`;
+
+        const { User } = require('../models');
+        await User.update(
+            { photo: photoUrl },
+            { where: { id: req.user.id } }
+        );
+
+        return res.json({ success: true, photoUrl });
+    } catch (error) {
+        next(error);
+    }
+}
   // DELETE /api/users/:id
   async deleteUser(req, res, next) {
     try {

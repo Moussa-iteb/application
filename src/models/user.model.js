@@ -14,7 +14,8 @@ module.exports = (sequelize) => {
     isBlocked: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_blocked' },
     lastLoginAt: { type: DataTypes.DATE, allowNull: true, field: 'last_login_at' },
     resetCode: { type: DataTypes.STRING(6), allowNull: true, field: 'reset_code' },
-    resetCodeExpires: { type: DataTypes.DATE, allowNull: true, field: 'reset_code_expires' }
+    resetCodeExpires: { type: DataTypes.DATE, allowNull: true, field: 'reset_code_expires' },
+    photo: { type: DataTypes.TEXT, allowNull: true }
   }, {
     tableName: 'users',
     timestamps: true,
