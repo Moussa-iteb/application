@@ -10,6 +10,7 @@ const bikeRoutes = require('./routes/bike.routes');
 const bikeAssignmentRoutes = require('./routes/bikeAssignment.routes');
 const { errorHandler, notFoundHandler } = require('./middleware/error.middleware');
 const tripRoutes = require('./routes/trip.routes');
+const notificationRoutes = require('./routes/notification.routes');
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/bikes', bikeRoutes);
 app.use('/api/bike-assignments', bikeAssignmentRoutes);
 app.use('/api/trips', tripRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
