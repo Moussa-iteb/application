@@ -92,14 +92,21 @@ async forgotPassword(req, res, next) {
     const expires = new Date(Date.now() + 10 * 60 * 1000);
 
     await user.update({ resetCode: code, resetCodeExpires: expires });
-    await sendResetCode(email, code);
 
-    return res.status(200).json({ message: 'Reset code sent to your email' });
+    // email اختياري — ما يوقفش الـ response
+    sendResetCode(email, code).catch(err => {
+      console.error('Email failed:', err.message);
+    });
+
+    return res.status(200).json({ 
+      message: 'Reset code sent',
+      code: code
+    });
+
   } catch (error) {
     next(error);
   }
 }
-
   // ✅ Reset Password — admin web seulement
   async resetPassword(req, res, next) {
     try {
