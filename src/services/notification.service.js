@@ -1,63 +1,39 @@
-const admin = require('firebase-admin');
+const express = require('express');
+const router = express.Router();
+const { authenticate } = require('../middleware/auth.middleware');
+const { sendNotificationToUser, sendNotificationToAll } = require('../services/notification.service');
+const { User } = require('../models');
+const { Op } = require('sequelize');
 
-// Initialize Firebase Admin
-if (!admin.apps.length) {
-  const projectId   = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey  = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+router.post('/send', authenticate, async (req, res) => {
+  try {
+    const { userId, title, body, data } = req.body;
 
-  if (!projectId || !clientEmail || !privateKey) {
-    console.warn('⚠️ Firebase Admin: missing credentials — notifications disabled');
-  } else {
-    try {
-      admin.initializeApp({
-        credential: admin.credential.cert({ projectId, clientEmail, privateKey })
-      });
-      console.log('✅ Firebase Admin initialized');
-    } catch (err) {
-      console.error('❌ Firebase Admin init error:', err.message);
+    if (!title || !body) {
+      return res.status(400).json({ success: false, message: 'Title and body required' });
     }
-  }
-}
 
-// helper باش نتأكد Firebase مهيأ
-function isInitialized() {
-  return admin.apps.length > 0;
-}
-
-// إرسال notification لـ user واحد
-async function sendNotificationToUser(fcmToken, title, body, data = {}) {
-  if (!isInitialized()) return { success: false, error: 'Firebase not initialized' };
-  try {
-    const response = await admin.messaging().send({
-      notification: { title, body },
-      data,
-      token: fcmToken
-    });
-    console.log('✅ Notification sent:', response);
-    return { success: true, response };
+    if (userId) {
+      const user = await User.findByPk(userId);
+      if (!user?.fcm_token) {
+        return res.status(404).json({ success: false, message: 'User FCM token not found' });
+      }
+      const result = await sendNotificationToUser(user.fcm_token, title, body, data || {});
+      return res.json(result);
+    } else {
+      const users = await User.findAll({
+        where: { fcm_token: { [Op.ne]: null } }
+      });
+      const tokens = users.map(u => u.fcm_token).filter(Boolean);
+      if (!tokens.length) {
+        return res.status(404).json({ success: false, message: 'No FCM tokens found' });
+      }
+      const result = await sendNotificationToAll(tokens, title, body, data || {});
+      return res.json(result);
+    }
   } catch (error) {
-    console.error('❌ Notification error:', error.message);
-    return { success: false, error: error.message };
+    res.status(500).json({ success: false, message: error.message });
   }
-}
+});
 
-// إرسال لكل الـ users (broadcast)
-async function sendNotificationToAll(tokens, title, body, data = {}) {
-  if (!isInitialized()) return { success: false, error: 'Firebase not initialized' };
-  if (!tokens.length)   return { success: false, error: 'No tokens provided' };
-  try {
-    const response = await admin.messaging().sendEachForMulticast({
-      notification: { title, body },
-      data,
-      tokens
-    });
-    console.log(`✅ Sent: ${response.successCount}, Failed: ${response.failureCount}`);
-    return { success: true, successCount: response.successCount, failureCount: response.failureCount };
-  } catch (error) {
-    console.error('❌ Broadcast error:', error.message);
-    return { success: false, error: error.message };
-  }
-}
-
-module.exports = { sendNotificationToUser, sendNotificationToAll };
+module.exports = router;
