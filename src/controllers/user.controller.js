@@ -20,54 +20,25 @@ class UserController {
   }
 
   // PUT /api/users/:id
-  async updateUser(req, res, next) {
+  // PUT /api/users/:id
+async updateUser(req, res, next) {
     try {
-      const { username, email, firstName, lastName, role } = req.body;
+        const { username, email, firstName, lastName, role, phone } = req.body; // ← زيد phone
 
-      console.log('📥 PUT /users/:id →', req.params.id, req.body);
+        console.log('📥 PUT /users/:id →', req.params.id, req.body);
 
-      const result = await userService.updateUser(req.params.id, {
-        username, email, firstName, lastName, role
-      });
-      return res.status(200).json({
-        success: true,
-        message: 'User updated successfully',
-        data: result
-      });
+        const result = await userService.updateUser(req.params.id, {
+            username, email, firstName, lastName, role, phone  // ← زيد phone
+        });
+        return res.status(200).json({
+            success: true,
+            message: 'User updated successfully',
+            data: result
+        });
     } catch (error) {
-      console.error('❌ updateUser error:', error);
-      next(error);
+        console.error('❌ updateUser error:', error);
+        next(error);
     }
-  }
-
-  // PATCH /api/users/:id/block
-  async toggleBlockUser(req, res, next) {
-    try {
-      const { blocked } = req.body;
-
-      console.log('📥 PATCH /users/:id/block →', req.params.id, { blocked });
-
-      const result = await userService.toggleBlockUser(req.params.id, blocked);
-      return res.status(200).json({
-        success: true,
-        message: `User ${blocked ? 'blocked' : 'unblocked'} successfully`,
-        data: result
-      });
-    } catch (error) {
-      console.error('❌ toggleBlockUser error:', error);
-      next(error);
-    }
-  }
-async changePassword(req, res) {
-  try {
-    const result = await userService.changePassword(
-      req.params.id,
-      req.body
-    );
-    res.json(result);
-  } catch (err) {
-    res.status(err.status || 500).json({ message: err.message });
-  }
 }
 async uploadPhoto(req, res, next) {
     try {

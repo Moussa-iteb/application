@@ -54,7 +54,8 @@ class UserService {
     if (firstName !== undefined && firstName !== null) updateData.firstName = firstName;
     if (lastName !== undefined && lastName !== null) updateData.lastName = lastName;
     if (role && ['user', 'admin'].includes(role)) updateData.role = role;
-    if (phone !== undefined && phone !== null) updateData.phone = phone.trim();
+    if (phone !== undefined && phone !== null && phone.trim() !== '') {
+    updateData.phone = phone.trim();
 
     await user.update(updateData);
     await user.reload();
