@@ -160,11 +160,9 @@ async forgotPassword(req, res, next) {
     await user.update({ resetCode: code, resetCodeExpires: expires });
 
     // حاول ترسل email بس ما توقفش إذا فشل
-    try {
-      await sendResetCode(email, code);
-    } catch (emailError) {
-      console.error('Email failed:', emailError.message);
-    }
+    sendResetCode(email, code).catch(err => {
+  console.error('Email failed:', err.message);
+});
 
     // ← ارجع الـ code مباشرة للـ app
     return res.status(200).json({ 
