@@ -74,30 +74,31 @@ class AuthController {
   }
 
   // ✅ Forgot Password — admin web seulement
-  async forgotPassword(req, res, next) {
-    try {
-      const { email } = req.body;
+  // ✅ Forgot Password — admin web seulement
+async forgotPassword(req, res, next) {
+  try {
+    const { email } = req.body;
 
-      const user = await User.findOne({ where: { email } });
-      if (!user) {
-        return res.status(404).json({ message: 'Email not found' });
-      }
-
-      if (user.role !== 'admin') {
-        return res.status(403).json({ message: 'Access denied. Admins only.' });
-      }
-
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      const expires = new Date(Date.now() + 10 * 60 * 1000);
-
-      await user.update({ resetCode: code, resetCodeExpires: expires });
-      await sendResetCode(email, code);
-
-      return res.status(200).json({ message: 'Reset code sent to your email' });
-    } catch (error) {
-      next(error);
+    const user = await User.findOne({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ message: 'Email not found' });
     }
+
+    if (user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Admins only.' });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 10 * 60 * 1000);
+
+    await user.update({ resetCode: code, resetCodeExpires: expires });
+    await sendResetCode(email, code);
+
+    return res.status(200).json({ message: 'Reset code sent to your email' });
+  } catch (error) {
+    next(error);
   }
+}
 
   // ✅ Reset Password — admin web seulement
   async resetPassword(req, res, next) {
