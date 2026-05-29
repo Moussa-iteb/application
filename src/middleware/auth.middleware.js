@@ -1,50 +1,39 @@
-const { verifyToken } = require('../utils/generateToken');
-const { User } = require('../models/index');
+const express = require('express');
+const router = express.Router();
+const { authenticate, authorize } = require('../middleware/auth.middleware');
+const { sendNotificationToUser, sendNotificationToAll } = require('../services/notification.service');
+const { User } = require('../models');
+const { Op } = require('sequelize');
 
-const authenticate = async (req, res, next) => {
+router.post('/send', authenticate, authorize('admin'), async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        message: 'Access denied. No token provided.'
-      });
+    const { userId, title, body, data } = req.body;
+
+    if (!title || !body) {
+      return res.status(400).json({ success: false, message: 'Title and body required' });
     }
 
-    const token = authHeader.split(' ')[1];
-    const decoded = verifyToken(token);
-    const user = await User.findByPk(decoded.id);
-
-    if (!user || !user.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token invalid or user no longer exists.'
+    if (userId) {
+      const user = await User.findByPk(userId);
+      if (!user?.fcm_token) {
+        return res.status(404).json({ success: false, message: 'User FCM token not found' });
+      }
+      const result = await sendNotificationToUser(user.fcm_token, title, body, data || {});
+      return res.json(result);
+    } else {
+      const users = await User.findAll({
+        where: { fcm_token: { [Op.ne]: null } }
       });
+      const tokens = users.map(u => u.fcm_token).filter(Boolean);
+      if (!tokens.length) {
+        return res.status(404).json({ success: false, message: 'No FCM tokens found' });
+      }
+      const result = await sendNotificationToAll(tokens, title, body, data || {});
+      return res.json(result);
     }
-
-    req.user = decoded;
-    next();
   } catch (error) {
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ success: false, message: 'Token has expired.' });
-    }
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ success: false, message: 'Invalid token.' });
-    }
-    next(error);
+    res.status(500).json({ success: false, message: error.message });
   }
-};
+});
 
-const authorize = (...roles) => {
-  return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: 'You do not have permission to perform this action.'
-      });
-    }
-    next();
-  };
-};
-
-module.exports = { authenticate, authorize };
+module.exports = router;
