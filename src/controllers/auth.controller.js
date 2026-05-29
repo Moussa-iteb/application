@@ -134,29 +134,40 @@ class AuthController {
 
   // ✅ Forgot Password — mobile users seulement
   async forgotPasswordUser(req, res, next) {
-    try {
-      const { email } = req.body;
+  try {
+    const { email } = req.body;
 
-      const user = await User.findOne({ where: { email } });
-      if (!user) {
-        return res.status(404).json({ message: 'Email not found' });
-      }
-
-      if (user.role === 'admin') {
-        return res.status(403).json({ message: 'Access denied.' });
-      }
-
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      const expires = new Date(Date.now() + 10 * 60 * 1000);
-
-      await user.update({ resetCode: code, resetCodeExpires: expires });
-      await sendResetCode(email, code);
-
-      return res.status(200).json({ message: 'Reset code sent to your email' });
-    } catch (error) {
-      next(error);
+    const user = await User.findOne({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ message: 'Email not found' });
     }
+
+    if (user.role === 'admin') {
+      return res.status(403).json({ message: 'Access denied.' });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 10 * 60 * 1000);
+
+    await user.update({ resetCode: code, resetCodeExpires: expires });
+
+    // حاول ترسل email بس ما توقفش إذا فشل
+    try {
+      await sendResetCode(email, code);
+    } catch (emailError) {
+      console.error('Email failed:', emailError.message);
+    }
+
+    // ← ارجع الـ code مباشرة للـ app
+    return res.status(200).json({ 
+      success: true,
+      message: 'Reset code sent',
+      code: code  // ← مؤقتاً للـ soutenance
+    });
+  } catch (error) {
+    next(error);
   }
+}
 
   // ✅ Reset Password — mobile users seulement
   async resetPasswordUser(req, res, next) {
