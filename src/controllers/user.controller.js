@@ -1,4 +1,5 @@
 const userService = require('../services/user.service');
+const { User } = require('../models');
 
 class UserController {
 
@@ -9,10 +10,7 @@ class UserController {
       const result = await userService.getAllUsers({
         page, limit, role, isActive, isBlocked
       });
-      return res.status(200).json({
-        success: true,
-        data: result
-      });
+      return res.status(200).json({ success: true, data: result });
     } catch (error) {
       console.error('❌ getAllUsers error:', error);
       next(error);
@@ -23,7 +21,6 @@ class UserController {
   async updateUser(req, res, next) {
     try {
       const { username, email, firstName, lastName, role, phone } = req.body;
-      console.log('📥 PUT /users/:id →', req.params.id, req.body);
       const result = await userService.updateUser(req.params.id, {
         username, email, firstName, lastName, role, phone
       });
@@ -42,7 +39,6 @@ class UserController {
   async toggleBlockUser(req, res, next) {
     try {
       const { blocked } = req.body;
-      console.log('📥 PATCH /users/:id/block →', req.params.id, { blocked });
       const result = await userService.toggleBlockUser(req.params.id, blocked);
       return res.status(200).json({
         success: true,
@@ -68,14 +64,32 @@ class UserController {
   // DELETE /api/users/:id
   async deleteUser(req, res, next) {
     try {
-      console.log('📥 DELETE /users/:id →', req.params.id);
       const result = await userService.deleteUser(req.params.id);
-      return res.status(200).json({
-        success: true,
-        message: result.message
-      });
+      return res.status(200).json({ success: true, message: result.message });
     } catch (error) {
       console.error('❌ deleteUser error:', error);
+      next(error);
+    }
+  }
+
+  // POST /api/users/fcm-token — app mobile
+  async saveFcmToken(req, res, next) {
+    try {
+      const { fcmToken } = req.body;
+
+      if (!fcmToken) {
+        return res.status(400).json({ success: false, message: 'FCM token required' });
+      }
+
+      await User.update(
+        { fcm_token: fcmToken },
+        { where: { id: req.user.id } }
+      );
+
+      console.log(`✅ FCM token saved for user ${req.user.id}`);
+      return res.status(200).json({ success: true, message: 'FCM token saved' });
+    } catch (error) {
+      console.error('❌ saveFcmToken error:', error);
       next(error);
     }
   }

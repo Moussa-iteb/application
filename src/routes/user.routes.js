@@ -10,4 +10,7 @@ router.patch('/:id/block',  authenticate, userController.toggleBlockUser);
 router.delete('/:id',       authenticate, userController.deleteUser);
 router.put('/:id/password', authenticate, userController.changePassword);
 
+// FCM Token — appelé par l'app mobile après login
+router.post('/fcm-token',   authenticate, userController.saveFcmToken);
+
 module.exports = router;
