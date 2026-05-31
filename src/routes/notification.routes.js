@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticate, authorize } = require('../middleware/auth.middleware');
 const { sendNotificationToUser, sendNotificationToAll } = require('../services/notification.service');
-const { User, NotificationLog } = require('../models');
+const { User } = require('../models');
 const { Op } = require('sequelize');
 
 router.post('/send', authenticate, authorize('admin'), async (req, res) => {
@@ -16,7 +16,6 @@ router.post('/send', authenticate, authorize('admin'), async (req, res) => {
     }
 
     if (userId) {
-      // ✅ Envoi à UN seul utilisateur — passe userId dans data FCM
       const user = await User.findByPk(userId);
       console.log('👤 User trouvé:', user?.id, 'FCM:', user?.fcm_token);
 
@@ -25,25 +24,12 @@ router.post('/send', authenticate, authorize('admin'), async (req, res) => {
       }
 
       const result = await sendNotificationToUser(
-        user.fcm_token,
-        title,
-        body,
-        { userId: String(userId) }  // ✅ app mobile filtre avec ce champ
+        user.fcm_token, title, body,
+        { userId: String(userId) }
       );
-
-      await NotificationLog.create({
-        title, body,
-        target:       'user',
-        userId:       userId,
-        successCount: 1,
-        failureCount: 0,
-        totalReached: 1,
-      });
-
       return res.json({ success: true, ...result });
 
     } else {
-      // ✅ Envoi à TOUS — pas de userId dans data
       const users  = await User.findAll({ where: { fcm_token: { [Op.ne]: null } } });
       const tokens = users.map(u => u.fcm_token).filter(Boolean);
 
@@ -51,17 +37,7 @@ router.post('/send', authenticate, authorize('admin'), async (req, res) => {
         return res.status(404).json({ success: false, message: 'No FCM tokens found' });
       }
 
-      const result = await sendNotificationToAll(tokens, title, body, {});  // ✅ data vide = pour tous
-
-      await NotificationLog.create({
-        title, body,
-        target:       'all',
-        userId:       null,
-        successCount: result.successCount,
-        failureCount: result.failureCount,
-        totalReached: result.successCount,
-      });
-
+      const result = await sendNotificationToAll(tokens, title, body, {});
       return res.json({ success: true, ...result });
     }
 
@@ -71,17 +47,8 @@ router.post('/send', authenticate, authorize('admin'), async (req, res) => {
   }
 });
 
-// GET /api/notifications/recent
 router.get('/recent', authenticate, authorize('admin'), async (req, res) => {
-  try {
-    const logs = await NotificationLog.findAll({
-      order: [['createdAt', 'DESC']],
-      limit: 10
-    });
-    res.json({ success: true, data: logs });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+  res.json({ success: true, data: [] });
 });
 
 module.exports = router;
