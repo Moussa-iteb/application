@@ -8,15 +8,14 @@ if (!admin.apps.length) {
 }
 
 async function sendNotificationToUser(fcmToken, title, body, data = {}) {
-  // ✅ FCM exige que toutes les valeurs dans data soient des strings
   const stringData = Object.fromEntries(
-    Object.entries(data).map(([k, v]) => [k, String(v)])
+    Object.entries({ title, body, ...data }).map(([k, v]) => [k, String(v)])
   );
 
   const message = {
     token: fcmToken,
-    notification: { title, body },
-    data: stringData,  // ← contient userId en string
+    data: stringData,          // ✅ seulement data — pas de bloc notification
+    android: { priority: 'high' }
   };
 
   const response = await admin.messaging().send(message);
@@ -25,13 +24,13 @@ async function sendNotificationToUser(fcmToken, title, body, data = {}) {
 
 async function sendNotificationToAll(tokens, title, body, data = {}) {
   const stringData = Object.fromEntries(
-    Object.entries(data).map(([k, v]) => [k, String(v)])
+    Object.entries({ title, body, ...data }).map(([k, v]) => [k, String(v)])
   );
 
   const message = {
     tokens,
-    notification: { title, body },
-    data: stringData,  // ← vide pour "tous"
+    data: stringData,          // ✅ seulement data — pas de bloc notification
+    android: { priority: 'high' }
   };
 
   const response = await admin.messaging().sendEachForMulticast(message);

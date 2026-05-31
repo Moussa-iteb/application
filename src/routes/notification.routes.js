@@ -6,6 +6,7 @@ const { User } = require('../models');
 const { Op } = require('sequelize');
 
 router.post('/send', authenticate, authorize('admin'), async (req, res) => {
+  console.log('🔥 /send appelé — ', new Date().toISOString());
   try {
     const { userId, title, body } = req.body;
 
