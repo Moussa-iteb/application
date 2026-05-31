@@ -1,5 +1,6 @@
 const userService = require('../services/user.service');
 const { User } = require('../models');
+const { Op } = require('sequelize');
 
 class UserController {
 
@@ -81,12 +82,19 @@ class UserController {
         return res.status(400).json({ success: false, message: 'FCM token required' });
       }
 
+      // ✅ Supprime ce token chez tous les autres utilisateurs
+      await User.update(
+        { fcm_token: null },
+        { where: { fcm_token: fcmToken, id: { [Op.ne]: req.user.id } } }
+      );
+
+      // ✅ Sauvegarde pour l'utilisateur connecté
       await User.update(
         { fcm_token: fcmToken },
         { where: { id: req.user.id } }
       );
 
-      console.log(`✅ FCM token saved for user ${req.user.id}`);
+      console.log(`✅ FCM token saved for user ${req.user.id}, removed from others`);
       return res.status(200).json({ success: true, message: 'FCM token saved' });
     } catch (error) {
       console.error('❌ saveFcmToken error:', error);
